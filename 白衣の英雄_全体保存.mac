@@ -1,0 +1,115 @@
+﻿openfile"URLリスト";//新規ページ作成
+#URLlist = hidemaruhandle(0);
+$uri1 = "http://nemuiyon.blog72.fc2.com/blog-category-2.html";//目次ページURL
+call HttpGet $uri1;//目次ページ取得
+$s1 = $$return;
+//ここから目次取得
+call LocalGrep $s1, "第一部</span>";
+call Replace $$return, ".+第一部", "第一部";
+call Replace $$return, "番外編セット.+", "";
+call Replace $$return, "<br />　<br />", "<br />";
+call Replace $$return, "<br />", "\n";
+call Replace $$return, "<br />", "\n";
+call Replace $$return, "<a href=.+?>", "";
+call Replace $$return, "<span style=\"font-size:large;\">", "";
+call Replace $$return, "</span>", "";
+call Replace $$return, "</a>", "";
+call Replace $$return, "\n\n", "\n";
+$s2 = filter("", "ToHankakuAlnum", "", $$return);
+//ここまで目次取得
+//ここからURL取得
+call LocalGrep $s1, "第一部</span>";
+call Replace $$return, "(?#maxlines:100)番外編セット.+", "";
+call Replace $$return, "<a href", "\n<a href";
+call LocalGrep $$return, "http";
+call Replace $$return, "^[^:]+: ", "";
+call Replace $$return, "<a href=\"([^\"]*)\".*", "\\1";
+$urllist = $$return;
+//ここまでURL取得
+insert $urllist;//URLリスト描画
+gofiletop;// ファイルの先頭にカーソルを移動
+//ここからループで個別タイトルと本文を取得
+#i = 0;
+while (code != eof){// カーソル位置に文字コードがあるか確認
+#nowLine = lineno;  // 行の番号
+$szline = gettext( 0, #nowLine-1, 1000, #nowLine-1 ); // 行の内容を取得(URL)
+call HttpGet $szline;//ページ取得
+$resu = $$return;
+call LocalGrep $resu, "height=\"43\"";//タイトル行を抽出
+call Replace $$return, ".*entry_title\">(.+)</td>.*", "\\1";//タイトルを抽出
+$taitoru[#i] = $$return;//タイトルを配列に格納
+call LocalGrep $resu, "main_txt\">.*<div class";//本文を抽出
+call Replace $$return, ".+main_txt\">(.+)<div class.+", "\\1";//本文を抽出2
+call Replace $$return, "<br />", "\\n";//改行変換
+call Replace $$return, "\\t\\t\\t<br>\\t\\t\\t\\t<a name=\"more\" id=\"more\"></a>", "";//変なの削除
+call Replace $$return, "《", "<<";//青空用に置換
+call Replace $$return, "》", ">>";//青空用に置換
+$honbun[#i] = $$return;//本文を配列に格納
+golineend;          // 行末に移動
+right;              // カーソル移動で、次の行にする
+#i = #i+1;
+}
+//ここまでループ
+
+//ここから全体を描画
+openfile"白衣の英雄";//新規ページ作成
+#hakuinoeiyuu = hidemaruhandle(0);
+
+//ヘッダー書き込み
+insert "白衣の英雄"+"\n";
+insert "■■■■■■■■■■■■■■■■■■■■■■■■■■"+"\n\n";
+insert $s2;
+insert "■■■■■■■■■■■■■■■■■■■■■■■■■■"+"\n";
+//ヘッダー書き込み終了
+//ループ書き込み
+#j = 0;
+while ($taitoru[#j] != ""){
+insert "［＃改ページ］"+"\n";
+insert "▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼"+"\n";
+insert "［＃中見出し］"+ $taitoru[#j] + "［＃中見出し終わり］"+"\n\n";
+insert $honbun[#j];
+insert "▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼"+"\n";
+#j = #j+1;
+}
+//ループ書き込み終了
+replaceallfast "\\n［＃中見出し終わり］", "［＃中見出し終わり］", regular;
+closehidemaruforced #URLlist;
+goto END;//メイン処理終了
+
+//以下関数
+END:
+	freedll;
+	endmacro;
+HttpGet:
+	#http = createobject("Msxml2.XMLHTTP");
+	if (!#http) #http = createobject("Microsoft.XMLHTTP");
+	if (!#http) {message "オブジェクトの生成に失敗しました"; endmacro;}
+	callmethod #http, "Open", "GET", $$1, false;
+	callmethod #http, "Send";
+	$$html = getpropstr(#http, "ResponseText");
+	releaseobject #http;
+	return $$html;
+Replace:
+	##a = hidemaruhandle(0);
+	openfile "/h";
+	##b = hidemaruhandle(0);
+	insert $$1;
+	replaceallfast $$2, $$3, regular;
+	selectall;
+	$$buf = gettext(seltopx,seltopy,selendx,selendy);
+	setactivehidemaru ##a;
+	closehidemaruforced ##b;
+	return $$buf;
+LocalGrep:
+	##c = hidemaruhandle(0);
+	openfile "/h";
+	##d = hidemaruhandle(0);
+	insert $$1;
+	localgrep $$2, regular;
+	##e = hidemaruhandle(0);
+	selectall;
+	$$buf = gettext(seltopx,seltopy,selendx,selendy);
+	setactivehidemaru ##c;
+	closehidemaruforced ##d;
+	closehidemaruforced ##e;
+	return $$buf;

@@ -1,0 +1,88 @@
+﻿openfile"白衣の英雄";//新規ページ作成
+#URLlist = hidemaruhandle(0);
+loaddll hidemarudir + "\\DengakuDLL.dll";//dllロード
+if (!result) {
+	message "田楽DLLをロードできませんでした";
+	endmacro;
+}
+call MLEDIT;//ダイアログ表示
+$uri1 = $$return;//ページURL
+call HttpGet $uri1;//ページ取得
+$resu = $$return;
+call LocalGrep $resu, "height=\"43\"";//タイトル行を抽出
+call Replace $$return, ".*entry_title\">(.+)</td>.*", "\\1";//タイトルを抽出
+$taitoru = $$return;//タイトルを格納
+call LocalGrep $resu, "main_txt\">.*<div class";//本文を抽出
+call Replace $$return, ".+main_txt\">(.+)<div class.+", "\\1";//本文を抽出2
+call Replace $$return, "<br />", "\\n";//改行変換
+call Replace $$return, "\\t\\t\\t<br>\\t\\t\\t\\t<a name=\"more\" id=\"more\"></a>", "";//変なの削除
+call Replace $$return, "《", "<<";//青空用に置換
+call Replace $$return, "》", ">>";//青空用に置換
+$honbun = $$return;//本文を格納
+insert "［＃改ページ］"+"\n";
+insert "▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼"+"\n";
+insert "［＃中見出し］"+ $taitoru + "［＃中見出し終わり］"+"\n\n";
+insert $honbun;
+insert "▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼▲▼"+"\n";
+replaceallfast "\\n［＃中見出し終わり］", "［＃中見出し終わり］", regular;
+goto END;//メイン処理終了
+//以下関数
+END:
+	freedll;
+	endmacro;
+HttpGet:
+	#http = createobject("Msxml2.XMLHTTP");
+	if (!#http) #http = createobject("Microsoft.XMLHTTP");
+	if (!#http) {message "オブジェクトの生成に失敗しました"; endmacro;}
+	callmethod #http, "Open", "GET", $$1, false;
+	callmethod #http, "Send";
+	$$html = getpropstr(#http, "ResponseText");
+	releaseobject #http;
+	return $$html;
+Replace:
+	##a = hidemaruhandle(0);
+	openfile "/h";
+	##b = hidemaruhandle(0);
+	insert $$1;
+	replaceallfast $$2, $$3, regular;
+	selectall;
+	$$buf = gettext(seltopx,seltopy,selendx,selendy);
+	setactivehidemaru ##a;
+	closehidemaruforced ##b;
+	return $$buf;
+LocalGrep:
+	##c = hidemaruhandle(0);
+	openfile "/h";
+	##d = hidemaruhandle(0);
+	insert $$1;
+	localgrep $$2, regular;
+	##e = hidemaruhandle(0);
+	selectall;
+	$$buf = gettext(seltopx,seltopy,selendx,selendy);
+	setactivehidemaru ##c;
+	closehidemaruforced ##d;
+	closehidemaruforced ##e;
+	return $$buf;
+MAKEDLG_ERROR:
+	message "ダイアログの作成に失敗しました。";
+	goto END;
+ERROR:
+	message "何らかのエラーによりマクロを中止します。";
+MLEDIT:
+	if(	dllfunc("NEWDIALOG","URL入力",80) == 0 ||
+		dllfunc("NEWCONTROL","edit","mledt1","ここにURLを入力") == 0 ||
+		dllfunc("SETCTRLHEIGHT","",1) == 0 ||
+		dllfunc("NEWCONTROL","okcancel","","") == 0) {
+		goto MAKEDLG_ERROR;
+	}
+MLEDIT_START:
+	if (!dllfunc("SHOWDIALOG",hidemaruhandle(0),1)) goto ERROR;
+	$name = "";
+	while (strlen($name) == 0) $name = dllfuncstr("WAITCTRLNOTIFY",10);
+	if (!dllfunc("ENDDIALOG")) goto ERROR;
+	if ($name == "0") {
+		goto END;
+	}else{
+		$$boo = dllfuncstr("GETCTRLSTRING","mledt1");
+	}
+	return $$boo;
